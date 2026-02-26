@@ -39,6 +39,12 @@ Features:
 - Statement whitelist by category: `readonly` / `ddl` / `full`
 - Mode-based permissions via `IOTDB_SQL_DRIVER_MODE`
 - Destructive SQL confirmation policy
+- Tree CQ enabled in whitelist:
+  - Readonly: `SHOW CONTINUOUS QUERIES`, `SHOW CQS`
+  - DDL: `CREATE CONTINUOUS QUERY` / `CREATE CQ`, `DROP CONTINUOUS QUERY` / `DROP CQ`
+- Downsampling execution path:
+  - ad-hoc: `SELECT ... GROUP BY ([start, end), interval[, slidingStep])`
+  - scheduled: CQ with `INTO` + optional `RESAMPLE` clause
 
 ### `metadata.py`
 
