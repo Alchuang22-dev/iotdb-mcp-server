@@ -29,6 +29,7 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import csv_payload_response
 
 _TREE_PATH_PATTERN = re.compile(r"^root(?:\.[A-Za-z_][A-Za-z0-9_]*|\.\*|\.\*\*)*$")
 _TABLE_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -91,7 +92,9 @@ def _validate_table_identifier(identifier: str) -> str:
 
 
 def _format_result(
-    res: SessionDataSet, session_or_table_session: Session | TableSession
+    res: SessionDataSet,
+    session_or_table_session: Session | TableSession,
+    tool_name: str,
 ) -> list[TextContent]:
     columns = res.get_column_names()
     rows: list[str] = []
@@ -99,7 +102,7 @@ def _format_result(
         row = res.next().get_fields()
         rows.append(",".join(map(str, row)))
     session_or_table_session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return csv_payload_response(tool_name, columns, rows)
 
 
 def _ensure_prefix(sql: str, allowed_prefixes: tuple[str, ...], action_name: str) -> None:
@@ -146,7 +149,7 @@ def register_metadata_tools(mcp, config: Config, logger: logging.Logger) -> None
                 _ensure_prefix(sql, tree_prefixes, "metadata_query")
                 session = session_pool.get_session()
                 res = session.execute_query_statement(sql)
-                return _format_result(res, session)
+                return _format_result(res, session, "metadata_query")
             except Exception as e:
                 if session:
                     session.close()
@@ -216,7 +219,7 @@ def register_metadata_tools(mcp, config: Config, logger: logging.Logger) -> None
                 _ensure_prefix(sql, table_prefixes, "metadata_query")
                 table_session = session_pool.get_session()
                 res = table_session.execute_query_statement(sql)
-                return _format_result(res, table_session)
+                return _format_result(res, table_session, "metadata_query")
             except Exception as e:
                 if table_session:
                     table_session.close()

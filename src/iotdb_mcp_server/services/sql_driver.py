@@ -29,6 +29,10 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import (
+    csv_payload_response,
+    payload_response,
+)
 
 _READONLY_PREFIXES_COMMON = (
     "SELECT",
@@ -211,7 +215,9 @@ def _assert_sql_driver_permission(
         )
 
 
-def _format_tree_result(res: SessionDataSet, session: Session) -> list[TextContent]:
+def _format_tree_result(
+    res: SessionDataSet, session: Session, tool_name: str
+) -> list[TextContent]:
     columns = res.get_column_names()
     rows: list[str] = []
     while res.has_next():
@@ -223,18 +229,18 @@ def _format_tree_result(res: SessionDataSet, session: Session) -> list[TextConte
         else:
             rows.append(",".join(map(str, record.get_fields())))
     session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return csv_payload_response(tool_name, columns, rows)
 
 
 def _format_table_result(
-    res: SessionDataSet, table_session: TableSession
+    res: SessionDataSet, table_session: TableSession, tool_name: str
 ) -> list[TextContent]:
     columns = res.get_column_names()
     rows: list[str] = []
     while res.has_next():
         rows.append(",".join(map(str, res.next().get_fields())))
     table_session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return csv_payload_response(tool_name, columns, rows)
 
 
 def register_sql_driver_tools(mcp, config: Config, logger: logging.Logger) -> None:
@@ -246,22 +252,19 @@ def register_sql_driver_tools(mcp, config: Config, logger: logging.Logger) -> No
     @mcp.tool()
     async def sql_driver_policy() -> list[TextContent]:
         """Show current sql_driver policy and statement whitelists."""
-        lines = [
-            f"sql_dialect={config.sql_dialect}",
-            f"mode={mode}",
-            f"enable_sql_driver={_env_bool('IOTDB_ENABLE_SQL_DRIVER', False)}",
-            f"require_destructive_confirm={_env_bool('IOTDB_SQL_DRIVER_REQUIRE_DESTRUCTIVE_CONFIRM', True)}",
-            "",
-            "[readonly]",
-            *whitelists["readonly"],
-            "",
-            "[ddl]",
-            *whitelists["ddl"],
-            "",
-            "[full]",
-            *whitelists["full"],
-        ]
-        return [TextContent(type="text", text="\n".join(lines))]
+        return payload_response(
+            "sql_driver_policy",
+            {
+                "sql_dialect": config.sql_dialect,
+                "mode": mode,
+                "enable_sql_driver": _env_bool("IOTDB_ENABLE_SQL_DRIVER", False),
+                "require_destructive_confirm": _env_bool(
+                    "IOTDB_SQL_DRIVER_REQUIRE_DESTRUCTIVE_CONFIRM", True
+                ),
+                "whitelists": whitelists,
+            },
+            message="SQL driver policy snapshot.",
+        )
 
     if config.sql_dialect == "tree":
         pool_config = PoolConfig(
@@ -300,19 +303,21 @@ def register_sql_driver_tools(mcp, config: Config, logger: logging.Logger) -> No
                 session = session_pool.get_session()
                 if category == "readonly":
                     res = session.execute_query_statement(normalized_sql)
-                    return _format_tree_result(res, session)
+                    return _format_tree_result(res, session, "sql_execute")
 
                 session.execute_non_query_statement(normalized_sql)
                 session.close()
-                return [
-                    TextContent(
-                        type="text",
-                        text=(
-                            f"Success: {normalized_sql}\n"
-                            f"category={category}, mode={mode}, matched_prefix={matched_prefix}"
-                        ),
-                    )
-                ]
+                return payload_response(
+                    "sql_execute",
+                    {
+                        "sql": normalized_sql,
+                        "category": category,
+                        "mode": mode,
+                        "matched_prefix": matched_prefix,
+                        "result": "success",
+                    },
+                    message="SQL executed successfully.",
+                )
             except Exception as e:
                 if session:
                     session.close()
@@ -355,19 +360,21 @@ def register_sql_driver_tools(mcp, config: Config, logger: logging.Logger) -> No
                 table_session = session_pool.get_session()
                 if category == "readonly":
                     res = table_session.execute_query_statement(normalized_sql)
-                    return _format_table_result(res, table_session)
+                    return _format_table_result(res, table_session, "sql_execute")
 
                 table_session.execute_non_query_statement(normalized_sql)
                 table_session.close()
-                return [
-                    TextContent(
-                        type="text",
-                        text=(
-                            f"Success: {normalized_sql}\n"
-                            f"category={category}, mode={mode}, matched_prefix={matched_prefix}"
-                        ),
-                    )
-                ]
+                return payload_response(
+                    "sql_execute",
+                    {
+                        "sql": normalized_sql,
+                        "category": category,
+                        "mode": mode,
+                        "matched_prefix": matched_prefix,
+                        "result": "success",
+                    },
+                    message="SQL executed successfully.",
+                )
             except Exception as e:
                 if table_session:
                     table_session.close()

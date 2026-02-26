@@ -26,6 +26,10 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import (
+    csv_payload_response,
+    sql_success_response,
+)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -82,7 +86,7 @@ def _format_result(res: SessionDataSet, session: Session) -> list[TextContent]:
         row = res.next().get_fields()
         rows.append(",".join(map(str, row)))
     session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return csv_payload_response("ttl_query", columns, rows)
 
 
 def register_ttl_tools(mcp, config: Config, logger: logging.Logger) -> None:
@@ -135,7 +139,7 @@ def register_ttl_tools(mcp, config: Config, logger: logging.Logger) -> None:
             session = session_pool.get_session()
             session.execute_non_query_statement(sql)
             session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("ttl_command", sql)
         except Exception as e:
             if session:
                 session.close()

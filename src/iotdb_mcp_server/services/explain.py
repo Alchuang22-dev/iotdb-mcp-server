@@ -27,18 +27,19 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import payload_response
 
 
-def _format_result(
+def _collect_result(
     res: SessionDataSet, session_or_table_session: Session | TableSession
-) -> list[TextContent]:
+) -> tuple[list[str], list[str]]:
     columns = res.get_column_names()
     rows: list[str] = []
     while res.has_next():
         row = res.next().get_fields()
         rows.append(",".join(map(str, row)))
     session_or_table_session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return columns, rows
 
 
 def _normalize_and_validate_sql(
@@ -107,13 +108,20 @@ def register_explain_tools(mcp, config: Config, logger: logging.Logger) -> None:
                 )
                 session = session_pool.get_session()
                 res = session.execute_query_statement(explain_sql)
-                explain_text = _format_result(res, session)[0].text
-                return [
-                    TextContent(
-                        type="text",
-                        text=f"Explain SQL: {explain_sql}\n\n{explain_text}",
-                    )
-                ]
+                columns, rows = _collect_result(res, session)
+                return payload_response(
+                    "explain_query",
+                    {
+                        "explain_sql": explain_sql,
+                        "plan": {
+                            "format": "csv",
+                            "columns": columns,
+                            "rows": rows,
+                            "text": "\n".join([",".join(columns)] + rows),
+                        },
+                    },
+                    message="Explain executed.",
+                )
             except Exception as e:
                 if session:
                     session.close()
@@ -145,13 +153,20 @@ def register_explain_tools(mcp, config: Config, logger: logging.Logger) -> None:
                 )
                 table_session = session_pool.get_session()
                 res = table_session.execute_query_statement(explain_sql)
-                explain_text = _format_result(res, table_session)[0].text
-                return [
-                    TextContent(
-                        type="text",
-                        text=f"Explain SQL: {explain_sql}\n\n{explain_text}",
-                    )
-                ]
+                columns, rows = _collect_result(res, table_session)
+                return payload_response(
+                    "explain_query",
+                    {
+                        "explain_sql": explain_sql,
+                        "plan": {
+                            "format": "csv",
+                            "columns": columns,
+                            "rows": rows,
+                            "text": "\n".join([",".join(columns)] + rows),
+                        },
+                    },
+                    message="Explain executed.",
+                )
             except Exception as e:
                 if table_session:
                     table_session.close()

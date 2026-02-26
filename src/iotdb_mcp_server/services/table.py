@@ -24,6 +24,7 @@ from iotdb.table_session_pool import TableSessionPool, TableSessionPoolConfig
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import sql_success_response
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -108,7 +109,7 @@ def register_table_tools(mcp, config: Config, logger: logging.Logger) -> None:
             table_session = session_pool.get_session()
             table_session.execute_non_query_statement(sql)
             table_session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("create_table_ddl", sql)
         except Exception as e:
             if table_session:
                 table_session.close()
@@ -126,7 +127,7 @@ def register_table_tools(mcp, config: Config, logger: logging.Logger) -> None:
             table_session = session_pool.get_session()
             table_session.execute_non_query_statement(sql)
             table_session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("alter_table_ddl", sql)
         except Exception as e:
             if table_session:
                 table_session.close()
@@ -144,7 +145,7 @@ def register_table_tools(mcp, config: Config, logger: logging.Logger) -> None:
             table_session = session_pool.get_session()
             table_session.execute_non_query_statement(sql)
             table_session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("drop_table_ddl", sql)
         except Exception as e:
             if table_session:
                 table_session.close()

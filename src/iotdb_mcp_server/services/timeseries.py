@@ -24,6 +24,7 @@ from iotdb.SessionPool import PoolConfig, SessionPool
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import sql_success_response
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -120,7 +121,7 @@ def register_timeseries_tools(mcp, config: Config, logger: logging.Logger) -> No
             session = session_pool.get_session()
             session.execute_non_query_statement(sql)
             session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("create_timeseries_ddl", sql)
         except Exception as e:
             if session:
                 session.close()
@@ -138,7 +139,7 @@ def register_timeseries_tools(mcp, config: Config, logger: logging.Logger) -> No
             session = session_pool.get_session()
             session.execute_non_query_statement(sql)
             session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("alter_timeseries_ddl", sql)
         except Exception as e:
             if session:
                 session.close()
@@ -164,7 +165,7 @@ def register_timeseries_tools(mcp, config: Config, logger: logging.Logger) -> No
             session = session_pool.get_session()
             session.execute_non_query_statement(sql)
             session.close()
-            return [TextContent(type="text", text=f"Success: {sql}")]
+            return sql_success_response("drop_timeseries_ddl", sql)
         except Exception as e:
             if session:
                 session.close()

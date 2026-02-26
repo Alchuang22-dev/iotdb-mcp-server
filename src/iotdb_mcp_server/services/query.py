@@ -12,6 +12,10 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import (
+    csv_payload_response,
+    text_payload_response,
+)
 
 
 def sanitize_filename(filename: str, base_dir: str) -> str:
@@ -82,7 +86,9 @@ def _ensure_export_directory(export_path: str, logger: logging.Logger) -> None:
         logger.warning(f"Failed to create export directory {export_path}: {str(e)}")
 
 
-def _prepare_tree_res(_res: SessionDataSet, _session: Session) -> list[TextContent]:
+def _prepare_tree_res(
+    _res: SessionDataSet, _session: Session, tool_name: str
+) -> list[TextContent]:
     columns = _res.get_column_names()
     result = []
     while _res.has_next():
@@ -95,16 +101,11 @@ def _prepare_tree_res(_res: SessionDataSet, _session: Session) -> list[TextConte
             row = record.get_fields()
             result.append(",".join(map(str, row)))
     _session.close()
-    return [
-        TextContent(
-            type="text",
-            text="\n".join([",".join(columns)] + result),
-        )
-    ]
+    return csv_payload_response(tool_name, columns, result)
 
 
 def _prepare_table_res(
-    _res: SessionDataSet, _table_session: TableSession
+    _res: SessionDataSet, _table_session: TableSession, tool_name: str
 ) -> list[TextContent]:
     columns = _res.get_column_names()
     result = []
@@ -112,12 +113,7 @@ def _prepare_table_res(
         row = _res.next().get_fields()
         result.append(",".join(map(str, row)))
     _table_session.close()
-    return [
-        TextContent(
-            type="text",
-            text="\n".join([",".join(columns)] + result),
-        )
-    ]
+    return csv_payload_response(tool_name, columns, result)
 
 
 def register_query_tools(mcp, config: Config, logger: logging.Logger) -> None:
@@ -187,7 +183,7 @@ def register_query_tools(mcp, config: Config, logger: logging.Logger) -> None:
                 stmt = query_sql.strip().upper()
                 if stmt.startswith("SELECT"):
                     res = session.execute_query_statement(query_sql)
-                    return _prepare_tree_res(res, session)
+                    return _prepare_tree_res(res, session, "select_query")
                 session.close()
                 raise ValueError("Only SELECT queries are allowed for select_query")
             except Exception as e:
@@ -254,13 +250,11 @@ def register_query_tools(mcp, config: Config, logger: logging.Logger) -> None:
                 for i in range(preview_rows):
                     preview_data.append(",".join(map(str, df.iloc[i])))
 
-                return [
-                    TextContent(
-                        type="text",
-                        text=f"Query results exported to {filepath}\n\nPreview (first {preview_rows} rows):\n"
-                        + "\n".join(preview_data),
-                    )
-                ]
+                return text_payload_response(
+                    "export_query",
+                    f"Query results exported to {filepath}\n\nPreview (first {preview_rows} rows):\n"
+                    + "\n".join(preview_data),
+                )
             except Exception as e:
                 if session:
                     session.close()
@@ -294,7 +288,7 @@ def register_query_tools(mcp, config: Config, logger: logging.Logger) -> None:
                     or stmt.startswith("SHOW")
                 ):
                     res = table_session.execute_query_statement(query_sql)
-                    return _prepare_table_res(res, table_session)
+                    return _prepare_table_res(res, table_session, "read_query")
                 table_session.close()
                 raise ValueError("Only SELECT queries are allowed for read_query")
             except Exception as e:
@@ -368,13 +362,11 @@ def register_query_tools(mcp, config: Config, logger: logging.Logger) -> None:
                 for i in range(preview_rows):
                     preview_data.append(",".join(map(str, df.iloc[i])))
 
-                return [
-                    TextContent(
-                        type="text",
-                        text=f"Query results exported to {filepath}\n\nPreview (first {preview_rows} rows):\n"
-                        + "\n".join(preview_data),
-                    )
-                ]
+                return text_payload_response(
+                    "export_table_query",
+                    f"Query results exported to {filepath}\n\nPreview (first {preview_rows} rows):\n"
+                    + "\n".join(preview_data),
+                )
             except Exception as e:
                 if table_session:
                     table_session.close()

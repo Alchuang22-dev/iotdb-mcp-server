@@ -29,6 +29,10 @@ from iotdb.utils.SessionDataSet import SessionDataSet
 from mcp.types import TextContent
 
 from iotdb_mcp_server.config import Config
+from iotdb_mcp_server.services.json_response import (
+    csv_payload_response,
+    sql_success_response,
+)
 
 _TABLE_DB_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TREE_DB_PATTERN = re.compile(r"^root(?:\.[A-Za-z_][A-Za-z0-9_]*)+$")
@@ -92,7 +96,9 @@ def _validate_database_name(sql_dialect: str, database: str) -> str:
 
 
 def _format_result(
-    res: SessionDataSet, session_or_table_session: Session | TableSession
+    res: SessionDataSet,
+    session_or_table_session: Session | TableSession,
+    tool_name: str,
 ) -> list[TextContent]:
     columns = res.get_column_names()
     rows: list[str] = []
@@ -100,7 +106,7 @@ def _format_result(
         row = res.next().get_fields()
         rows.append(",".join(map(str, row)))
     session_or_table_session.close()
-    return [TextContent(type="text", text="\n".join([",".join(columns)] + rows))]
+    return csv_payload_response(tool_name, columns, rows)
 
 
 def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None:
@@ -126,7 +132,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 session = session_pool.get_session()
                 sql = "SHOW DATABASES DETAILS" if details else "SHOW DATABASES"
                 res = session.execute_query_statement(sql)
-                return _format_result(res, session)
+                return _format_result(res, session, "list_databases")
             except Exception as e:
                 if session:
                     session.close()
@@ -144,7 +150,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 session = session_pool.get_session()
                 session.execute_non_query_statement(sql)
                 session.close()
-                return [TextContent(type="text", text=f"Success: {sql}")]
+                return sql_success_response("create_database", sql)
             except Exception as e:
                 if session:
                     session.close()
@@ -164,7 +170,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 session = session_pool.get_session()
                 session.execute_non_query_statement(sql)
                 session.close()
-                return [TextContent(type="text", text=f"Success: {sql}")]
+                return sql_success_response("drop_database", sql)
             except Exception as e:
                 if session:
                     session.close()
@@ -189,7 +195,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 table_session = session_pool.get_session()
                 sql = "SHOW DATABASES DETAILS" if details else "SHOW DATABASES"
                 res = table_session.execute_query_statement(sql)
-                return _format_result(res, table_session)
+                return _format_result(res, table_session, "list_databases")
             except Exception as e:
                 if table_session:
                     table_session.close()
@@ -213,7 +219,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 table_session = session_pool.get_session()
                 table_session.execute_non_query_statement(sql)
                 table_session.close()
-                return [TextContent(type="text", text=f"Success: {sql}")]
+                return sql_success_response("create_database", sql)
             except Exception as e:
                 if table_session:
                     table_session.close()
@@ -239,7 +245,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 table_session = session_pool.get_session()
                 table_session.execute_non_query_statement(sql)
                 table_session.close()
-                return [TextContent(type="text", text=f"Success: {sql}")]
+                return sql_success_response("drop_database", sql)
             except Exception as e:
                 if table_session:
                     table_session.close()
@@ -256,7 +262,7 @@ def register_database_tools(mcp, config: Config, logger: logging.Logger) -> None
                 table_session = session_pool.get_session()
                 table_session.execute_non_query_statement(sql)
                 table_session.close()
-                return [TextContent(type="text", text=f"Success: {sql}")]
+                return sql_success_response("use_database", sql)
             except Exception as e:
                 if table_session:
                     table_session.close()

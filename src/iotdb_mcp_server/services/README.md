@@ -109,6 +109,45 @@ Features:
   - `model_query(model_sql)`
   - `model_command(model_sql, confirm_destructive=False)`
 
+### `json_response.py`
+
+- Shared response wrapper and parser:
+  - `JsonParser.check_format(obj)`
+  - `JsonParser.parse(text)`
+  - `payload_response(tool, payload, message=None)`
+  - `text_payload_response(tool, text, message=None)`
+  - `csv_payload_response(tool, columns, rows, message=None)`
+  - `sql_success_response(tool, sql)`
+
+## Tool Response JSON Envelope
+
+All tools now return `TextContent.text` as a JSON envelope instead of plain text.
+
+Envelope format:
+
+```json
+{
+  "version": "1.0",
+  "tool": "tool_name",
+  "ok": true,
+  "timestamp": "2026-02-26T00:00:00+00:00",
+  "payload": {},
+  "message": "optional"
+}
+```
+
+Payload conventions:
+
+- Query-like tools: `payload.format="csv"` with `columns`, `rows`, `text`
+- Text-like tools: `payload.format="text"` with `text`
+- SQL success tools: `payload.sql` + `payload.result="success"`
+
+Parser check:
+
+- Wrapper output is validated by `JsonParser.check_format(...)`
+- Serialized text is parsed again by `JsonParser.parse(...)` before returning
+- Invalid envelope shape raises `ValueError`
+
 ## Security and Permission Gates
 
 Most write/DDL/model tools are disabled by default and require env flags.
